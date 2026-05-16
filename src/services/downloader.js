@@ -1,4 +1,4 @@
-import { checkSession, setSessionStatus } from "./loginMicrosoft.js";
+import { checkSession, setSessionStatus, restoreSessionCookies } from "./loginMicrosoft.js";
 import fs from "fs";
 import path from "path";
 import puppeteer from "puppeteer";
@@ -45,12 +45,22 @@ export async function downloadLatestFile() {
       "--disable-dev-shm-usage",
       "--disable-gpu",
       "--disable-software-rasterizer",
-      "--single-process"
+      "--single-process",
+      "--no-zygote",
+      "--disable-extensions"
     ],
     userDataDir: "./session-data",
   });
 
   const page = await browser.newPage();
+  
+  // Tenta restaurar cookies do Supabase antes de verificar a sessão
+  try {
+    await restoreSessionCookies(page);
+  } catch (err) {
+    log(`⚠️ Erro ao restaurar cookies: ${err.message}`);
+  }
+
   await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/136.0.0.0 Safari/537.36");
 
   try {

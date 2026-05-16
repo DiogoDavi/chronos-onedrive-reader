@@ -1,120 +1,10 @@
 
-// import "dotenv/config";
-// import express from "express";
-// import cron from "node-cron";
-// import puppeteer from "puppeteer";
-// import { runJob } from "./src/job/runJob.js";
-// import { doLogin } from "./src/services/loginMicrosoft.js";
-// import { log } from "./src/services/logger.js";
-
-// const app = express();
-// const PORT = Number(process.env.PORT) || 4000;
-// const INTERNAL_SECRET = process.env.INTERNAL_SECRET || "";
-
-// app.use(express.json());
-
-// // ─── Health ───────────────────────────────────────────────────
-// app.get("/health", (_req, res) => {
-//   res.json({ status: "ok", timestamp: new Date().toISOString() });
-// });
-
-// // ─── POST /internal/start-login ───────────────────────────────
-// // Recebe email/senha do Chronos Backend e inicia login headless
-// let loginEmAndamento = false;
-
-// app.post("/internal/start-login", async (req, res) => {
-
-//   // validação do secret
-//   if (INTERNAL_SECRET && req.body?.secret !== INTERNAL_SECRET) {
-//     return res.status(401).json({ error: "Não autorizado" });
-//   }
-
-//   const { email, password } = req.body;
-
-//   if (!email || !password) {
-//     return res.status(400).json({ error: "email e password são obrigatórios" });
-//   }
-
-//   if (loginEmAndamento) {
-//     return res.json({ success: true, message: "Login já em andamento" });
-//   }
-
-//   // responde imediatamente — roda em background
-//   res.json({ success: true, message: "Login iniciado" });
-
-//   loginEmAndamento = true;
-
-//   // executa login em background
-//   ; (async () => {
-//     let browser;
-//     try {
-//       log("🔐 [start-login] Iniciando Puppeteer...");
-
-//       const { executablePath } = await import("puppeteer");
-//       browser = await puppeteer.launch({
-//         headless: "new",
-//         executablePath: executablePath(),
-//         args: [
-//           "--no-sandbox",
-//           "--disable-setuid-sandbox",
-//           "--disable-dev-shm-usage",
-//           "--disable-gpu",
-//           "--single-process"
-//         ],
-//         userDataDir: "./session-data",
-//       });
-
-//       const page = await browser.newPage();
-//       await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/136.0.0.0 Safari/537.36");
-
-//       // email e senha passados apenas em memória — nunca logados
-//       await doLogin(page, email, password);
-
-//       log("✅ [start-login] Login concluído");
-
-//     } catch (err) {
-//       log(`❌ [start-login] Erro: ${err.message}`);
-//     } finally {
-//       if (browser) await browser.close().catch(() => { });
-//       loginEmAndamento = false;
-//     }
-//   })();
-// });
-
-// // ─── Cron: job a cada 2 minutos ───────────────────────────────
-// let jobEmExecucao = false;
-
-// cron.schedule("*/2 * * * *", async () => {
-//   if (jobEmExecucao) { log("⏳ Job ignorado — já em execução"); return; }
-//   jobEmExecucao = true;
-//   try {
-//     await runJob();
-//   } catch (err) {
-//     log(`❌ Erro no cron: ${err.message}`);
-//   } finally {
-//     jobEmExecucao = false;
-//   }
-// }, { timezone: "America/Sao_Paulo" });
-
-// // ─── Start ────────────────────────────────────────────────────
-// app.listen(PORT, "0.0.0.0", async () => {
-//   log(`🚀 ONEDRIVE-READER rodando na porta ${PORT}`);
-//   try {
-//     await runJob();
-//   } catch (err) {
-//     log(`❌ Erro na execução inicial: ${err.message}`);
-//   }
-// });
-
-/**
- * ONEDRIVE-READER — server.js (raiz do projeto)
- */
 import "dotenv/config";
 import express from "express";
 import cron from "node-cron";
 import puppeteer from "puppeteer";
-import { runJob } from "./src/job/runJob.js";        // ✅ path correto
-import { doLogin } from "./src/services/loginMicrosoft.js";
+import { runJob } from "./src/job/runJob.js";
+import { doLogin, restoreSessionCookies } from "./src/services/loginMicrosoft.js";
 import { log } from "./src/services/logger.js";
 
 const app = express();
@@ -132,7 +22,6 @@ app.get("/health", (_req, res) => {
 let loginEmAndamento = false;
 
 app.post("/internal/start-login", async (req, res) => {
-
   if (INTERNAL_SECRET && req.body?.secret !== INTERNAL_SECRET) {
     return res.status(401).json({ error: "Não autorizado" });
   }
@@ -156,7 +45,6 @@ app.post("/internal/start-login", async (req, res) => {
     try {
       log("🔐 [start-login] Iniciando Puppeteer...");
 
-      // detecta Chromium instalado pelo puppeteer automaticamente
       const { executablePath } = await import("puppeteer");
       const chromePath = executablePath();
       log(`🔍 Chromium: ${chromePath}`);
@@ -170,7 +58,9 @@ app.post("/internal/start-login", async (req, res) => {
           "--disable-dev-shm-usage",
           "--disable-gpu",
           "--single-process",
-          "--no-zygote"
+          "--no-zygote",
+          "--disable-extensions",
+          "--disable-software-rasterizer"
         ],
         userDataDir: "./session-data",
         timeout: 60000
@@ -178,6 +68,9 @@ app.post("/internal/start-login", async (req, res) => {
 
       const page = await browser.newPage();
       await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/136.0.0.0 Safari/537.36");
+
+      // Tenta restaurar cookies antes do login
+      await restoreSessionCookies(page).catch(() => {});
 
       await doLogin(page, email, password);
 
