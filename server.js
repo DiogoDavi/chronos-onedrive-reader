@@ -40,9 +40,6 @@ app.post("/internal/start-login", async (req, res) => {
         return res.json({ success: true, message: "Login já em andamento" });
     }
 
-    // Responde imediatamente — login roda em background
-    res.json({ success: true, message: "Login iniciado" });
-
     loginEmAndamento = true;
 
     // ── Atualiza status para "pending" imediatamente ──────────
@@ -50,6 +47,9 @@ app.post("/internal/start-login", async (req, res) => {
     await setSessionStatus("pending").catch(err =>
         log(`⚠️ Erro ao setar pending: ${err.message}`)
     );
+
+    // Responde agora — status já está como pending no Supabase
+    res.json({ success: true, message: "Login iniciado" });
 
     // ── Timeout de segurança ──────────────────────────────────
     // Evita que o frontend fique preso em "Conectando..." para sempre
