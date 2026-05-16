@@ -4,7 +4,7 @@ import express from "express";
 import cron from "node-cron";
 import puppeteer from "puppeteer";
 import { runJob } from "./src/job/runJob.js";
-import { doLogin, restoreSessionCookies } from "./src/services/loginMicrosoft.js";
+import { doLogin, restoreSessionCookies, setSessionStatus, setConfig } from "./src/services/loginMicrosoft.js";
 import { log } from "./src/services/logger.js";
 
 const app = express();
