@@ -34,23 +34,8 @@ export async function downloadLatestFile() {
 
   if (!fs.existsSync(DOWNLOAD_DIR)) fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 
-  const executablePath = await getBrowserPath();
-
-  const browser = await puppeteer.launch({
-    headless: "new",
-    executablePath,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--disable-software-rasterizer",
-      "--single-process",
-      "--no-zygote",
-      "--disable-extensions"
-    ],
-    userDataDir: "./session-data",
-  });
+  const { launchBrowser } = await import("./browser.js");
+  const browser = await launchBrowser();
 
   const page = await browser.newPage();
   

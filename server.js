@@ -40,31 +40,16 @@ app.post("/internal/start-login", async (req, res) => {
 
   loginEmAndamento = true;
 
+  // ── Atualiza status imediatamente para dar feedback ao Frontend ──
+  await setSessionStatus("pending").catch(() => {});
+
   ; (async () => {
     let browser;
     try {
       log("🔐 [start-login] Iniciando Puppeteer...");
-
-      const { executablePath } = await import("puppeteer");
-      const chromePath = executablePath();
-      log(`🔍 Chromium: ${chromePath}`);
-
-      browser = await puppeteer.launch({
-        headless: "new",
-        executablePath: chromePath,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-gpu",
-          "--single-process",
-          "--no-zygote",
-          "--disable-extensions",
-          "--disable-software-rasterizer"
-        ],
-        userDataDir: "./session-data",
-        timeout: 60000
-      });
+      
+      const { launchBrowser } = await import("./src/services/browser.js");
+      browser = await launchBrowser();
 
       const page = await browser.newPage();
       await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/136.0.0.0 Safari/537.36");
@@ -78,6 +63,8 @@ app.post("/internal/start-login", async (req, res) => {
 
     } catch (err) {
       log(`❌ [start-login] Erro: ${err.message}`);
+      await setConfig("last_error", err.message).catch(() => {});
+      await setSessionStatus("expired").catch(() => {});
     } finally {
       if (browser) await browser.close().catch(() => { });
       loginEmAndamento = false;
