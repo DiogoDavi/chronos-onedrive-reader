@@ -132,13 +132,19 @@ app.post("/internal/start-login", async (req, res) => {
     log("🔐 [/internal/start-login] Iniciando login via Puppeteer...");
 
     const browser = await puppeteer.launch({
+      executablePath:
+        process.env.PUPPETEER_EXECUTABLE_PATH ||
+        "/usr/bin/google-chrome-stable",
+
       headless: "new",
+
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu"
       ],
+
       userDataDir: "./session-data",
     });
 

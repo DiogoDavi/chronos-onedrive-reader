@@ -305,7 +305,9 @@ export async function downloadLatestFile() {
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu"
-    ]
+    ],
+
+    userDataDir: "./session-data",
   });
 
   const page = await browser.newPage();
