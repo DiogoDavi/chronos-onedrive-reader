@@ -89,7 +89,10 @@ app.post("/internal/start-login", async (req, res) => {
 let jobEmExecucao = false;
 
 cron.schedule("*/2 * * * *", async () => {
-  if (jobEmExecucao) { log("⏳ Job ignorado — já em execução"); return; }
+  if (jobEmExecucao || loginEmAndamento) { 
+    log(`⏳ Job ignorado — ${loginEmAndamento ? "Login em andamento" : "Já em execução"}`); 
+    return; 
+  }
   jobEmExecucao = true;
   try {
     await runJob();

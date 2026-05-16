@@ -162,12 +162,13 @@ export async function doLogin(page, email, password) {
             continue;
         }
 
-        // ── MFA numérico (Authenticator) ──────────────────────
+        // ── MFA numérico (Authenticator com número) ──────────────
         try {
             const mfaCode = await page.$eval(
                 '#idRichContext_DisplaySign',
                 el => el.textContent.trim()
-            );
+            ).catch(() => null);
+
             if (mfaCode && mfaCode !== "") {
                 if (!mfaDetectado) {
                     log(`📱 MFA detectado — código: ${mfaCode}`);
@@ -175,10 +176,33 @@ export async function doLogin(page, email, password) {
                 }
                 await setSessionStatus("mfa_required");
                 await setConfig("mfa_code", mfaCode);
-                await setConfig("mfa_message", "Aprove o login no Microsoft Authenticator");
+                await setConfig("mfa_message", "Insira o código no Microsoft Authenticator");
                 continue;
             }
         } catch { }
+
+        // ── MFA Aprovação (Authenticator sem número / Notificação) ──
+        const isWaitingApproval = pageText.includes("Aprove") || pageText.includes("Approve") || pageText.includes("notificação");
+        if (isWaitingApproval && !mfaDetectado) {
+            log("📱 MFA detectado — Aguardando aprovação no app");
+            mfaDetectado = true;
+            await setSessionStatus("mfa_required");
+            await setConfig("mfa_code", "APP");
+            await setConfig("mfa_message", "Aprove a notificação no seu Microsoft Authenticator");
+            continue;
+        }
+
+        // ── MFA SMS / Outros ─────────────────────────────────
+        if (pageText.includes("Código") || pageText.includes("SMS") || pageText.includes("text message")) {
+             if (!mfaDetectado) {
+                log("📱 MFA detectado — Aguardando código via SMS/Email");
+                mfaDetectado = true;
+                await setSessionStatus("mfa_required");
+                await setConfig("mfa_code", "SMS");
+                await setConfig("mfa_message", "Insira o código enviado por SMS/Email");
+             }
+             continue;
+        }
 
         // ── Senha incorreta ───────────────────────────────────
         if (pageText.includes("incorreta") || pageText.includes("incorrect") || pageText.includes("wrong")) {
