@@ -2,11 +2,11 @@
     "name": "onedrive-reader-v5",
     "version": "1.0.0",
     "type": "module",
-    "main": "src/index.js",
+    "main": "server.js",
     "scripts": {
         "build": "npx puppeteer browsers install chrome",
-        "start": "node src/index.js",
-        "dev": "node --watch src/index.js"
+        "start": "node server.js",
+        "dev": "node --watch server.js"
     },
     "engines": {
         "node": ">=18"
