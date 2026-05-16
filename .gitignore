@@ -1,0 +1,125 @@
+# ==========================================
+# 📦 Node.js / Dependências
+# ==========================================
+node_modules/
+.npm/
+.pnpm-store/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==========================================
+# 🔐 Variáveis de Ambiente / Segurança
+# ==========================================
+.env
+.env.*
+!.env.example
+!.env.template
+
+token.json
+credentials.json
+
+*.pem
+*.key
+*.cert
+
+# ==========================================
+# 🤖 Puppeteer / Sessões / Automação
+# ==========================================
+session-data/
+downloads/
+logs/
+
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.ldb
+
+Default/
+Cache/
+Code Cache/
+GPUCache/
+Service Worker/
+
+chromium/
+chrome/
+.browser/
+playwright/
+
+# ==========================================
+# 🚀 Build / Deploy
+# ==========================================
+dist/
+build/
+out/
+
+.next/
+.nuxt/
+
+.vercel/
+.netlify/
+
+*.tsbuildinfo
+
+# ==========================================
+# 🧪 Scripts Locais / Testes
+# ==========================================
+test-data.js
+test-insert.js
+test-schema.js
+test-schema2.js
+test-select.js
+test-trigger.js
+test-trigger-insert.js
+test-upsert.js
+test-upsert-batch.js
+
+# ==========================================
+# ⚙️ Temporários
+# ==========================================
+tmp/
+temp/
+.tmp/
+
+# ==========================================
+# 🖥️ macOS
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.AppleDouble
+.LSOverride
+.Trashes
+.Spotlight-V100
+.TemporaryItems
+
+# ==========================================
+# 🪟 Windows
+# ==========================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ==========================================
+# 🛠️ IDEs / Editores
+# ==========================================
+.vscode/
+.idea/
+.vs/
+
+*.suo
+*.swp
+*.swo
+
+.eslintcache
+
+# ==========================================
+# ☁️ Render / Runtime
+# ==========================================
+render.yaml.local
+.render/
