@@ -248,10 +248,10 @@ app.post("/internal/start-login", async (req, res) => {
     try {
       log("🔐 [start-login] Iniciando Puppeteer...");
 
-      const { executablePath } = await import("puppeteer");
+      // const { executablePath } = await import("puppeteer");
       browser = await puppeteer.launch({
         headless: "new",
-        executablePath: executablePath(),
+
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
@@ -259,6 +259,7 @@ app.post("/internal/start-login", async (req, res) => {
           "--disable-gpu",
           "--single-process"
         ],
+
         userDataDir: "./session-data",
       });
 
