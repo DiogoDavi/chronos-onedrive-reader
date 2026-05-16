@@ -1,25 +1,32 @@
-FROM node:20-slim
+# ─── Imagem base com Chrome pré-instalado ────────────────────────────────────
+# Usar a imagem oficial do Puppeteer é a forma mais confiável no Render/Docker
+# pois já vem com todas as dependências de sistema necessárias.
+FROM ghcr.io/puppeteer/puppeteer:22.6.0
 
-# Instala dependências do sistema para o Chrome
-RUN apt-get update \
-    && apt-get install -y wget gnupg \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst fonts-freefont-ttf libxss1 \
-      --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Variável de ambiente para o Puppeteer não baixar o Chrome de novo
+# Puppeteer já está instalado na imagem base — não baixar de novo
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+# Caminho do Chrome instalado pela imagem base
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
-COPY package*.json ./
-RUN npm install
+WORKDIR /home/pptruser/app
 
+# Copia dependências primeiro (cache layer)
+COPY package*.json ./
+
+# Instala dependências como root, depois muda owner
+USER root
+RUN npm install --omit=dev
+
+# Copia código fonte
 COPY . .
+
+# Cria diretórios necessários com permissão correta para o usuário pptruser
+RUN mkdir -p downloads logs session-data \
+    && chown -R pptruser:pptruser /home/pptruser/app
+
+# Volta para usuário não-root (segurança e conformidade com a imagem base)
+USER pptruser
 
 EXPOSE 4000
 
