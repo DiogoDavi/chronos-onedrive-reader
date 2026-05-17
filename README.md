@@ -245,5 +245,6 @@ Sistema de automação logística com:
 
 ```
 ```
+git add .
 git commit --allow-empty -m "chore: trigger sistema"
 git push origin main

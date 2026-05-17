@@ -4,8 +4,8 @@
     "type": "module",
     "main": "server.js",
     "scripts": {
-        "build": "./render-build.sh",
-        "start": "PUPPETEER_CACHE_DIR=$HOME/.cache/puppeteer node server.js",
+        "build": "chmod +x render-build.sh && ./render-build.sh",
+        "start": "node server.js",
         "dev": "node --watch server.js"
     },
     "engines": {
