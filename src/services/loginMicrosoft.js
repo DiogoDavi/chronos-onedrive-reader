@@ -42,8 +42,8 @@ export async function restoreSessionCookies(page) {
     }
 
     const diasDesdeUpdate = (Date.now() - new Date(data.updated_at).getTime()) / (1000 * 60 * 60 * 24);
-    if (diasDesdeUpdate > 25) {
-        log(`⚠️ Sessão expirada há ${Math.floor(diasDesdeUpdate)} dias`);
+    if (diasDesdeUpdate > 90) {
+        log(`⚠️ Sessão expirada há ${Math.floor(diasDesdeUpdate)} dias (limite: 90 dias)`);
         return false;
     }
 
