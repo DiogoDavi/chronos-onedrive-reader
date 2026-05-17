@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cron from "node-cron";
+import fs from "fs";
 import { runJob } from "./src/job/runJob.js";
 import { doLogin, restoreSessionCookies, setSessionStatus, setConfig } from "./src/services/loginMicrosoft.js";
 import { launchBrowser } from "./src/services/browser.js";
@@ -84,6 +85,13 @@ app.post("/internal/start-login", async (req, res) => {
 
         } catch (err) {
             log(`❌ [start-login] Erro: ${err.message}`);
+            try {
+                if (!fs.existsSync("./logs")) fs.mkdirSync("./logs", { recursive: true });
+                await page.screenshot({ path: "./logs/login-error.png", fullPage: true });
+                log("📸 Screenshot do erro salvo em ./logs/login-error.png");
+            } catch (screenshotErr) {
+                log(`⚠️ Falha ao salvar screenshot do erro: ${screenshotErr.message}`);
+            }
             await setConfig("last_error", err.message).catch(() => {});
             await setSessionStatus("expired").catch(() => {});
         } finally {
