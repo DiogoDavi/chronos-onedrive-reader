@@ -90,41 +90,48 @@ export async function checkSession(page) {
 // ─── Login completo com email/senha + MFA ─────────────────────
 // email e senha vêm apenas via parâmetro — NUNCA são logados ou persistidos
 export async function doLogin(page, email, password) {
-    log("🔐 Iniciando login Microsoft (headless)...");
+    log("🔐 [STEP 7] Entrando em doLogin() para iniciar fluxo da Microsoft (headless)");
     await setSessionStatus("pending");
     await setConfig("mfa_code", "");
     await setConfig("mfa_message", "");
 
     // ── PASSO 1: navega para login ────────────────────────────
+    log("🌐 [STEP 7] Carregando tela de login https://login.microsoftonline.com/ ...");
     await page.goto("https://login.microsoftonline.com/", {
         waitUntil: "networkidle2",
         timeout: 60000
     });
+    log("🌐 [STEP 7] Tela de login carregada.");
 
     // ── PASSO 2: email ────────────────────────────────────────
+    log("📧 [STEP 8] Procurando campo de email 'loginfmt'...");
     await page.waitForSelector('input[name="loginfmt"]', { timeout: 30000 });
     await new Promise(r => setTimeout(r, 800));
 
+    log("📧 [STEP 8] Inserindo email no campo...");
     await page.$eval('input[name="loginfmt"]', (el, v) => {
         el.value = v;
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
     }, email.trim());
 
+    log("📧 [STEP 8] Clicando no botão Avançar ('#idSIButton9')...");
     await page.click('#idSIButton9');
-    log("📧 Email preenchido");
+    log("📧 [STEP 8] Email enviado. Aguardando campo de senha...");
 
     // ── PASSO 3: senha ────────────────────────────────────────
+    log("🔑 [STEP 9] Aguardando campo de senha 'passwd'...");
     try {
         await page.waitForSelector('input[name="passwd"]', { timeout: 20000, visible: true });
     } catch {
-        // tenta seletor alternativo
+        log("🔑 [STEP 9] Campo 'passwd' não encontrado, tentando seletor alternativo 'input[type=password]'...");
         await page.waitForSelector('input[type="password"]', { timeout: 10000, visible: true });
     }
 
     await new Promise(r => setTimeout(r, 800));
 
     const senhaSelector = await page.$('input[name="passwd"]') ? 'input[name="passwd"]' : 'input[type="password"]';
+    log(`🔑 [STEP 9] Preenchendo a senha usando o seletor '${senhaSelector}'...`);
 
     await page.$eval(senhaSelector, (el, v) => {
         el.value = v;
@@ -135,10 +142,12 @@ export async function doLogin(page, email, password) {
     // senha usada — libera referência
     password = null;
 
+    log("🔑 [STEP 9] Clicando no botão Entrar ('#idSIButton9')...");
     await page.click('#idSIButton9');
-    log("🔑 Senha enviada");
+    log("🔑 [STEP 9] Senha enviada com sucesso.");
 
     // ── PASSO 4: monitora resultado ───────────────────────────
+    log("🔄 [STEP 10] Iniciando loop de monitoramento da autenticação...");
     let autenticado = false;
     let mfaDetectado = false;
 
@@ -146,9 +155,11 @@ export async function doLogin(page, email, password) {
         await new Promise(r => setTimeout(r, 3000));
 
         const url = page.url();
+        log(`🔄 [STEP 10] URL atual do navegador: ${url} (Iteração ${i + 1}/100)`);
 
         // saiu do login = sucesso
         if (!url.includes("login.microsoftonline.com")) {
+            log("✅ [STEP 10] Navegador saiu de login.microsoftonline.com! Login bem-sucedido.");
             autenticado = true;
             break;
         }
@@ -157,8 +168,8 @@ export async function doLogin(page, email, password) {
 
         // ── "Manter conectado?" ───────────────────────────────
         if (pageText.includes("Manter") || pageText.includes("Stay signed")) {
+            log("✅ [STEP 10] Tela 'Manter conectado?' detectada. Confirmando...");
             await page.click('#idSIButton9').catch(() => { });
-            log("✅ 'Manter conectado' confirmado");
             continue;
         }
 
@@ -171,7 +182,7 @@ export async function doLogin(page, email, password) {
 
             if (mfaCode && mfaCode !== "") {
                 if (!mfaDetectado) {
-                    log(`📱 MFA detectado — código: ${mfaCode}`);
+                    log(`📱 [STEP 11] MFA numérico detectado! Código exibido: ${mfaCode}`);
                     mfaDetectado = true;
                 }
                 await setSessionStatus("mfa_required");
@@ -184,7 +195,7 @@ export async function doLogin(page, email, password) {
         // ── MFA Aprovação (Authenticator sem número / Notificação) ──
         const isWaitingApproval = pageText.includes("Aprove") || pageText.includes("Approve") || pageText.includes("notificação");
         if (isWaitingApproval && !mfaDetectado) {
-            log("📱 MFA detectado — Aguardando aprovação no app");
+            log("📱 [STEP 11] MFA Aprovação (Authenticator) detectado! Aguardando aprovação no app...");
             mfaDetectado = true;
             await setSessionStatus("mfa_required");
             await setConfig("mfa_code", "APP");
@@ -195,7 +206,7 @@ export async function doLogin(page, email, password) {
         // ── MFA SMS / Outros ─────────────────────────────────
         if (pageText.includes("Código") || pageText.includes("SMS") || pageText.includes("text message")) {
              if (!mfaDetectado) {
-                log("📱 MFA detectado — Aguardando código via SMS/Email");
+                log("📱 [STEP 11] MFA via SMS/Email detectado! Aguardando código...");
                 mfaDetectado = true;
                 await setSessionStatus("mfa_required");
                 await setConfig("mfa_code", "SMS");
@@ -206,7 +217,7 @@ export async function doLogin(page, email, password) {
 
         // ── Senha incorreta ───────────────────────────────────
         if (pageText.includes("incorreta") || pageText.includes("incorrect") || pageText.includes("wrong")) {
-            log("❌ Senha incorreta");
+            log("❌ [STEP 11] Senha incorreta detectada!");
             await setSessionStatus("expired");
             await setConfig("last_error", "Senha incorreta");
             throw new Error("Senha incorreta");
@@ -214,7 +225,7 @@ export async function doLogin(page, email, password) {
 
         // ── Conta bloqueada ───────────────────────────────────
         if (pageText.includes("bloqueada") || pageText.includes("locked")) {
-            log("❌ Conta bloqueada");
+            log("❌ [STEP 11] Conta bloqueada detectada!");
             await setSessionStatus("expired");
             await setConfig("last_error", "Conta bloqueada");
             throw new Error("Conta bloqueada");
@@ -222,12 +233,14 @@ export async function doLogin(page, email, password) {
     }
 
     if (!autenticado) {
+        log("❌ [STEP 11] Loop finalizado sem sucesso (Timeout)");
         await setSessionStatus("expired");
         await setConfig("last_error", "Timeout no login");
         throw new Error("Timeout no login");
     }
 
     // ── Sucesso: salva cookies e limpa MFA ────────────────────
+    log("🍪 [STEP 11] Extraindo cookies da sessão para persistência...");
     const cookies = await page.cookies();
     await saveSessionCookies(cookies);
 
@@ -237,6 +250,6 @@ export async function doLogin(page, email, password) {
     await setConfig("last_error", "");
     await setSessionStatus("active");
 
-    log("✅ Login Microsoft concluído — Sync OK!");
+    log("✅ [STEP 11] Login Microsoft concluído e sessão ativada — Sync OK!");
     return true;
 }
