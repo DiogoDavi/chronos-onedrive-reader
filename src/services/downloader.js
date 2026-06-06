@@ -1,4 +1,9 @@
-import { checkSession, setSessionStatus, restoreSessionCookies } from "./loginMicrosoft.js";
+import {
+  checkSession,
+  setSessionStatus,
+  restoreSessionCookies
+} from "./loginMicrosoft.js";
+
 import fs from "fs";
 import path from "path";
 import puppeteer from "puppeteer";
@@ -7,140 +12,391 @@ import { log } from "./logger.js";
 const DOWNLOAD_DIR = "./downloads";
 const MAX_FILES = 10;
 
+// ─────────────────────────────────────────────
+
+function ensureDir(dir) {
+
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+// ─────────────────────────────────────────────
+
+function sleep(ms) {
+
+  return new Promise(r => setTimeout(r, ms));
+}
+
+// ─────────────────────────────────────────────
+
 function cleanupOldFiles() {
-  const files = fs
-    .readdirSync(DOWNLOAD_DIR)
-    .filter(f => f.endsWith(".xlsx"))
-    .map(f => ({ name: f, path: path.join(DOWNLOAD_DIR, f), time: fs.statSync(path.join(DOWNLOAD_DIR, f)).mtime.getTime() }))
-    .sort((a, b) => b.time - a.time);
-  for (const file of files.slice(MAX_FILES)) {
-    try { fs.unlinkSync(file.path); log(`🗑️ Removido: ${file.name}`); } catch { }
-  }
-}
 
-// ─── Detecta caminho do Chromium instalado pelo puppeteer ─────
-async function getBrowserPath() {
   try {
-    const { executablePath } = await import('puppeteer');
-    const p = executablePath();
-    log(`🔍 Chromium encontrado em: ${p}`);
-    return p;
+
+    const files = fs
+      .readdirSync(DOWNLOAD_DIR)
+      .filter(f => f.endsWith(".xlsx"))
+      .map(f => ({
+        name: f,
+        path: path.join(DOWNLOAD_DIR, f),
+        time: fs.statSync(path.join(DOWNLOAD_DIR, f)).mtime.getTime()
+      }))
+      .sort((a, b) => b.time - a.time);
+
+    for (const file of files.slice(MAX_FILES)) {
+
+      try {
+
+        fs.unlinkSync(file.path);
+
+        log(`🗑️ Removido: ${file.name}`);
+
+      } catch { }
+    }
+
+  } catch { }
+}
+
+// ─────────────────────────────────────────────
+
+async function getBrowserPath() {
+
+  try {
+
+    const { executablePath } = await import("puppeteer");
+
+    return executablePath();
+
   } catch {
-    return undefined; // deixa puppeteer decidir
+
+    return undefined;
+
   }
 }
 
-export async function downloadLatestFile() {
+// ─────────────────────────────────────────────
 
-  if (!fs.existsSync(DOWNLOAD_DIR)) fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+function convertToDirectDownloadUrl(url) {
+
+  // REMOVE parâmetros
+  url = url.split("?")[0];
+
+  // transforma /:x:/g/ em download.aspx
+  if (url.includes("/:x:/g/")) {
+
+    return `${url}?download=1`;
+  }
+
+  return url;
+}
+
+// ─────────────────────────────────────────────
+
+async function safeScreenshot(page, file) {
+
+  try {
+
+    if (!page.isClosed()) {
+
+      await page.screenshot({
+        path: file,
+        fullPage: true
+      });
+    }
+
+  } catch { }
+}
+
+// ─────────────────────────────────────────────
+
+// export async function downloadLatestFile() {
+export async function downloadLatestFile(targetUrl) {
+
+  ensureDir(DOWNLOAD_DIR);
+  ensureDir("./logs");
 
   const executablePath = await getBrowserPath();
 
   const browser = await puppeteer.launch({
+
     headless: "new",
+
     executablePath,
+
     args: [
+
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
       "--disable-software-rasterizer",
-      "--single-process",
-      "--no-zygote",
       "--disable-extensions"
+
     ],
-    userDataDir: "./session-data",
+
+    userDataDir: "./session-data"
+
   });
 
-  const page = await browser.newPage();
-  
-  // Tenta restaurar cookies do Supabase antes de verificar a sessão
-  try {
-    await restoreSessionCookies(page);
-  } catch (err) {
-    log(`⚠️ Erro ao restaurar cookies: ${err.message}`);
-  }
-
-  await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/136.0.0.0 Safari/537.36");
+  let page;
 
   try {
-    const sessaoAtiva = await checkSession(page);
-    if (!sessaoAtiva) throw new Error("SESSION_EXPIRED");
 
-    const targetUrl = process.env.ONEDRIVE_URL || process.env.SHAREPOINT_URL;
-    if (!targetUrl) throw new Error("ONEDRIVE_URL não definida");
+    page = await browser.newPage();
 
-    log("🌐 Acessando SharePoint...");
-    await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 180000 });
+    page.setDefaultTimeout(180000);
 
-    if (page.url().includes("login.microsoftonline.com")) {
+    page.setDefaultNavigationTimeout(180000);
+
+    page.on("console", msg => {
+
+      const text = msg.text();
+
+      if (
+        text.includes("BSSO") ||
+        text.includes("Telemetry") ||
+        text.includes("icons were re-registered")
+      ) {
+        return;
+      }
+
+      log(`🖥️ ${text}`);
+    });
+
+    // ─────────────────────────────────────────
+
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/136.0.0.0 Safari/537.36"
+    );
+
+    // ─────────────────────────────────────────
+
+    try {
+
+      await restoreSessionCookies(page);
+
+    } catch (err) {
+
+      log(`⚠️ restoreSessionCookies: ${err.message}`);
+    }
+
+    // ─────────────────────────────────────────
+
+    const sessionOk = await checkSession(page);
+
+    if (!sessionOk) {
+
       await setSessionStatus("expired");
+
       throw new Error("SESSION_EXPIRED");
     }
 
-    log(`📍 URL: ${page.url()}`);
+    // ─────────────────────────────────────────
 
-    if (!fs.existsSync("./logs")) fs.mkdirSync("./logs", { recursive: true });
-    await page.screenshot({ path: "./logs/sharepoint-loaded.png", fullPage: true });
+    // const targetUrl =
+    //   process.env.ONEDRIVE_URL ||
+    //   process.env.SHAREPOINT_URL;
 
-    log("⏳ Aguardando frames...");
-    await page.waitForFunction(() => window.frames.length > 0, { timeout: 120000, polling: 2000 });
-    await new Promise(r => setTimeout(r, 8000));
-
-    const frames = page.frames();
-    log(`🧩 Frames: ${frames.length}`);
-
-    let fileUrl = null;
-    for (const frame of frames) {
-      try {
-        const url = await frame.evaluate(() =>
-          window._wopiContextJson?.FileGetUrl || window.docProps?.FileGetUrl || null
-        );
-        if (url) { fileUrl = url; break; }
-      } catch { }
+    if (!targetUrl) {
+      throw new Error("URL não informada");
     }
 
-    if (!fileUrl) {
-      const html = await page.content();
-      const match = html.match(/https:\/\/[^"]+download[^"]+/i);
-      if (match) fileUrl = match[0];
-    }
+    // ─────────────────────────────────────────
 
-    if (!fileUrl) {
-      await page.screenshot({ path: "./logs/wopi-not-found.png", fullPage: true });
-      throw new Error("FileGetUrl não encontrado");
-    }
+    log("🌐 Abrindo SharePoint...");
 
-    log("✅ URL encontrada — baixando...");
+    await page.goto(targetUrl, {
 
-    const cookies = await page.cookies();
-    const cookieString = cookies.map(c => `${c.name}=${c.value}`).join("; ");
+      waitUntil: "networkidle2",
 
-    const response = await fetch(fileUrl, {
-      headers: { cookie: cookieString, "user-agent": "Mozilla/5.0" }
+      timeout: 180000
+
     });
 
-    if (!response.ok) throw new Error(`Falha download: ${response.status}`);
+    // ─────────────────────────────────────────
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const filePath = path.join(DOWNLOAD_DIR, `arquivo_${Date.now()}.xlsx`);
+    await sleep(5000);
+
+    // ─────────────────────────────────────────
+
+    const currentUrl = page.url();
+
+    log(`📍 ${currentUrl}`);
+
+
+
+
+
+    const html = await page.content();
+
+    fs.writeFileSync(
+      "./logs/cpg-page.html",
+      html
+    );
+
+
+
+
+    // sessão morreu
+    if (
+      currentUrl.includes("login.microsoftonline.com")
+    ) {
+
+      await setSessionStatus("expired");
+
+      throw new Error("SESSION_EXPIRED");
+    }
+
+    // ─────────────────────────────────────────
+
+    await safeScreenshot(
+      page,
+      "./logs/sharepoint.png"
+    );
+
+    // ─────────────────────────────────────────
+
+    const downloadUrl =
+      convertToDirectDownloadUrl(currentUrl);
+
+    log(`🔗 ${downloadUrl}`);
+
+    // ─────────────────────────────────────────
+
+    const cookies = await page.cookies();
+
+    const cookieString = cookies
+      .map(c => `${c.name}=${c.value}`)
+      .join("; ");
+
+    // ─────────────────────────────────────────
+
+    log("⬇️ Baixando XLSX...");
+
+    const response = await fetch(downloadUrl, {
+
+      method: "GET",
+
+      redirect: "follow",
+
+      headers: {
+
+        cookie: cookieString,
+
+        "user-agent":
+          "Mozilla/5.0",
+
+        accept:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*"
+
+      }
+    });
+
+    // ─────────────────────────────────────────
+
+    if (!response.ok) {
+
+      throw new Error(
+        `Falha download: ${response.status()}`
+      );
+    }
+
+    // ─────────────────────────────────────────
+
+    const buffer = Buffer.from(
+      await response.arrayBuffer()
+    );
+
+    // XLSX é ZIP => começa com PK
+    const signature =
+      buffer.slice(0, 2).toString();
+
+
+
+    // if (signature !== "PK") {
+
+    //   fs.writeFileSync(
+    //     "./logs/invalid-response.html",
+    //     buffer
+    //   );
+
+    //   throw new Error(
+    //     "Resposta não é XLSX válido"
+    //   );
+    // }
+
+
+    if (signature !== "PK") {
+
+      fs.writeFileSync(
+        "./logs/invalid-response.html",
+        buffer
+      );
+
+      log("⚠️ Resposta salva em logs/invalid-response.html");
+
+      const texto = buffer.toString("utf8");
+
+      const pos = texto.indexOf("FileGetUrl");
+
+      if (pos > -1) {
+        log(texto.substring(pos, pos + 3000));
+      }
+
+      throw new Error(
+        "Resposta não é XLSX válido"
+      );
+    }
+
+
+    // ─────────────────────────────────────────
+
+    const filePath = path.join(
+      DOWNLOAD_DIR,
+      `arquivo_${Date.now()}.xlsx`
+    );
+
     fs.writeFileSync(filePath, buffer);
+
     cleanupOldFiles();
 
+    // ─────────────────────────────────────────
+
     await setSessionStatus("active");
+
     log(`📄 Arquivo salvo: ${filePath}`);
+
     return filePath;
 
   } catch (err) {
-    if (err.message === "SESSION_EXPIRED") {
-      log("🔴 Sessão expirada — aguardando reconexão via frontend");
-    } else {
-      log(`❌ Erro: ${err.message}`);
-      try { await page.screenshot({ path: "./logs/error-final.png", fullPage: true }); } catch { }
+
+    const message =
+      err?.message || "Erro desconhecido";
+
+    log(`❌ ${message}`);
+
+    if (page) {
+
+      await safeScreenshot(
+        page,
+        "./logs/error.png"
+      );
+    }
+
+    if (message !== "SESSION_EXPIRED") {
+
       await setSessionStatus("expired");
     }
+
     throw err;
+
   } finally {
-    await browser.close();
+
+    try {
+
+      await browser.close();
+
+    } catch { }
   }
 }

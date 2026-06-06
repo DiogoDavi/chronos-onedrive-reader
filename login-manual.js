@@ -10,87 +10,170 @@ console.log("🚀 Abrindo browser para login manual...");
 console.log("📋 Faça login normalmente na janela que abrir.");
 console.log("✅ Após logar, aguarde a mensagem de conclusão aqui.");
 
-// const browser = await puppeteer.launch({
-//     headless: false,
-//     defaultViewport: null,
-//     args: ["--start-maximized", "--no-sandbox"],
-//     userDataDir: "./session-data", // salva a sessão aqui
-// });
-
-
-
 const browser = await puppeteer.launch({
-    headless: "new",
+    headless: false, // IMPORTANTE: login manual precisa aparecer
     args: [
+        "--start-maximized",
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--window-size=1920,1080"
+        "--disable-gpu"
     ],
-    defaultViewport: {
-        width: 1920,
-        height: 1080
-    },
+    defaultViewport: null,
     userDataDir: "./session-data"
 });
 
-
-
-
-
-
-
-
-
 const page = await browser.newPage();
 
-// preenche email automaticamente
+// ─────────────────────────────────────────────
+// Abre login Microsoft
+// ─────────────────────────────────────────────
 await page.goto("https://login.microsoftonline.com/", {
     waitUntil: "networkidle2",
     timeout: 60000
 });
 
-// verifica se já está logado
+// ─────────────────────────────────────────────
+// Verifica sessão já ativa
+// ─────────────────────────────────────────────
 if (!page.url().includes("login.microsoftonline.com")) {
     console.log("✅ Sessão já ativa! Nada a fazer.");
     await browser.close();
     process.exit(0);
 }
 
-// preenche email
-await page.waitForSelector('input[name="loginfmt"]', { timeout: 15000 });
-await page.$eval('input[name="loginfmt"]', (el, v) => {
-    el.value = v;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-}, process.env.MICROSOFT_EMAIL.trim());
+// ─────────────────────────────────────────────
+// Aguarda campo de email
+// ─────────────────────────────────────────────
+console.log("📧 Aguardando campo de email...");
 
-await page.click('#idSIButton9');
-console.log("📧 Email preenchido! Agora DIGITE SUA SENHA na janela e clique Entrar.");
+await page.waitForSelector('input[name="loginfmt"]', {
+    timeout: 30000,
+    visible: true
+});
 
-// aguarda você logar — até 5 minutos
-console.log("⏳ Aguardando seu login (5 minutos)...");
+await new Promise(r => setTimeout(r, 1500));
+
+// ─────────────────────────────────────────────
+// Preenche email
+// ─────────────────────────────────────────────
+console.log("📧 Inserindo email...");
+
+await page.$eval(
+    'input[name="loginfmt"]',
+    (el, value) => {
+        el.value = value;
+
+        el.dispatchEvent(
+            new Event("input", {
+                bubbles: true
+            })
+        );
+
+        el.dispatchEvent(
+            new Event("change", {
+                bubbles: true
+            })
+        );
+    },
+    process.env.MICROSOFT_EMAIL.trim()
+);
+
+// ─────────────────────────────────────────────
+// Clica botão avançar (CORRIGIDO)
+// ─────────────────────────────────────────────
+console.log("➡️ Clicando em Avançar...");
+
+await page.waitForSelector('#idSIButton9', {
+    timeout: 30000,
+    visible: true
+});
+
+await new Promise(r => setTimeout(r, 2000));
+
+// CLICK VIA DOM (evita erro clickablePoint)
+await page.evaluate(() => {
+    const btn = document.querySelector('#idSIButton9');
+
+    if (btn) {
+        btn.click();
+    }
+});
+
+console.log("📧 Email preenchido!");
+console.log("🔑 Agora DIGITE SUA SENHA manualmente.");
+console.log("📱 Aprove MFA/Auth no celular se aparecer.");
+
+// ─────────────────────────────────────────────
+// Aguarda login manual
+// ─────────────────────────────────────────────
+console.log("⏳ Aguardando login manual (5 minutos)...");
 
 try {
+
     await page.waitForFunction(
         () => !window.location.href.includes("login.microsoftonline.com"),
-        { timeout: 300000 }
+        {
+            timeout: 300000
+        }
     );
 
-    // confirma "manter conectado" se aparecer
+    console.log("✅ Login detectado com sucesso!");
+
+    // ─────────────────────────────────────────
+    // Verifica "Manter conectado?"
+    // ─────────────────────────────────────────
     try {
-        await page.waitForSelector('#idSIButton9', { timeout: 8000, visible: true });
-        await page.click('#idSIButton9');
+
+        console.log("🔄 Verificando tela 'Manter conectado?'...");
+
+        await page.waitForSelector('#idSIButton9', {
+            timeout: 10000,
+            visible: true
+        });
+
+        await new Promise(r => setTimeout(r, 2000));
+
+        await page.evaluate(() => {
+            const btn = document.querySelector('#idSIButton9');
+
+            if (btn) {
+                btn.click();
+            }
+        });
+
         console.log("✅ 'Manter conectado' confirmado");
-    } catch { }
 
-    await new Promise(r => setTimeout(r, 2000));
-    console.log("✅ Login realizado com sucesso!");
+    } catch {
+        console.log("ℹ️ Tela 'Manter conectado?' não apareceu");
+    }
+
+    // ─────────────────────────────────────────
+    // Aguarda cookies estabilizarem
+    // ─────────────────────────────────────────
+    await new Promise(r => setTimeout(r, 3000));
+
+    console.log("");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("✅ LOGIN REALIZADO COM SUCESSO");
     console.log("💾 Sessão salva em ./session-data");
-    console.log("🚀 Agora rode normalmente: node src/index.js");
+    console.log("🚀 Agora rode normalmente:");
+    console.log("node src/index.js");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("");
 
-} catch {
-    console.log("❌ Timeout — tente novamente");
+} catch (err) {
+
+    console.log("");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("❌ TIMEOUT NO LOGIN");
+    console.log("⚠️ Você demorou mais de 5 minutos");
+    console.log("🔄 Execute novamente:");
+    console.log("node login-manual.js");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("");
+
+    console.error(err);
 }
 
 await browser.close();
