@@ -72,8 +72,14 @@ export async function restoreSessionCookies(page) {
     }
 
     let cookies;
+
     try {
-        cookies = typeof data.cookies === "string" ? JSON.parse(data.cookies) : data.cookies;
+        cookies = typeof data.cookies === "string"
+            ? JSON.parse(data.cookies)
+            : data.cookies;
+
+        log(`COOKIES RECEBIDOS: ${cookies.length}`);
+
     } catch {
         log("⚠️ Erro ao parsear cookies");
         return false;
@@ -99,6 +105,11 @@ export async function checkSession(page) {
         waitUntil: "networkidle2",
         timeout: 60000
     });
+
+    const browserCookies = await page.cookies();
+
+    log(`COOKIES NO BROWSER: ${browserCookies.length}`);
+    log(`URL ATUAL: ${page.url()}`);
 
     try {
         await page.waitForFunction(
