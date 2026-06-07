@@ -2,12 +2,6 @@ FROM node:22-bullseye
 
 WORKDIR /app
 
-COPY package*.json ./
-
-RUN npm install
-
-COPY . .
-
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
@@ -26,7 +20,14 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
-    --no-install-recommends
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
 
 RUN mkdir -p \
     /app/downloads \
