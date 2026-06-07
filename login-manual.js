@@ -39,7 +39,14 @@ await page.goto("https://login.microsoftonline.com/", {
 // ─────────────────────────────────────────────
 if (!page.url().includes("login.microsoftonline.com")) {
     console.log("✅ Sessão já ativa! Nada a fazer.");
-    const cookies = await page.cookies();
+    const cookies = await page.cookies(
+        "https://login.microsoftonline.com",
+        "https://www.office.com",
+        "https://portal.office.com"
+    );
+
+    console.log("COOKIES CAPTURADOS:");
+    console.log(cookies.map(c => c.name));
 
     await saveSessionCookies(cookies);
 
@@ -160,7 +167,15 @@ try {
     await new Promise(r => setTimeout(r, 3000));
 
     // Salva cookies no Supabase
-    const cookies = await page.cookies();
+    // Salva cookies no Supabase
+    const cookies = await page.cookies(
+        "https://login.microsoftonline.com",
+        "https://www.office.com",
+        "https://portal.office.com"
+    );
+
+    console.log("COOKIES CAPTURADOS:");
+    console.log(cookies.map(c => c.name));
 
     await saveSessionCookies(cookies);
 

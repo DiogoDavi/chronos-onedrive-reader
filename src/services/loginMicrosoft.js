@@ -87,10 +87,26 @@ export async function restoreSessionCookies(page) {
 
     for (const cookie of cookies) {
         try {
+
+            log(`Tentando restaurar: ${cookie.name}`);
+
             await page.setCookie(cookie);
+
+            log(`OK: ${cookie.name}`);
+
         } catch (err) {
-            log(`⚠️ Cookie ignorado: ${cookie?.name}`);
+
+            log(`ERRO COOKIE ${cookie.name}: ${err.message}`);
+
         }
+    }
+
+    const afterCookies = await page.cookies();
+
+    log(`COOKIES RESTAURADOS: ${afterCookies.length}`);
+
+    for (const c of afterCookies.slice(0, 20)) {
+        log(`COOKIE: ${c.name}`);
     }
 
     log(`✅ Sessão restaurada (${Math.floor(diasDesdeUpdate)} dias de idade)`);
