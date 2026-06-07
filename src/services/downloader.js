@@ -178,6 +178,7 @@ export async function downloadLatestFile(targetUrl) {
     try {
 
       await restoreSessionCookies(page);
+      log("🌐 Abrindo SharePoint...");
 
     } catch (err) {
 
@@ -186,14 +187,14 @@ export async function downloadLatestFile(targetUrl) {
 
     // ─────────────────────────────────────────
 
-    const sessionOk = await checkSession(page);
+    // const sessionOk = await checkSession(page);
 
-    if (!sessionOk) {
+    // if (!sessionOk) {
 
-      await setSessionStatus("expired");
+    //   await setSessionStatus("expired");
 
-      throw new Error("SESSION_EXPIRED");
-    }
+    //   throw new Error("SESSION_EXPIRED");
+    // }
 
     // ─────────────────────────────────────────
 
@@ -246,9 +247,19 @@ export async function downloadLatestFile(targetUrl) {
       currentUrl.includes("login.microsoftonline.com")
     ) {
 
-      await setSessionStatus("expired");
+      const html = await page.content();
 
-      throw new Error("SESSION_EXPIRED");
+      if (
+        html.includes("Sign in") ||
+        html.includes("Entrar") ||
+        html.includes("loginfmt")
+      ) {
+
+        await setSessionStatus("expired");
+        throw new Error("SESSION_EXPIRED");
+      }
+
+      log("⚠️ Microsoft redirecionou mas a sessão ainda pode estar válida");
     }
 
     // ─────────────────────────────────────────
