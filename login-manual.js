@@ -4,6 +4,7 @@
  */
 
 import "dotenv/config";
+import { saveSessionCookies } from "./src/services/loginMicrosoft.js";
 import puppeteer from "puppeteer";
 
 console.log("🚀 Abrindo browser para login manual...");
@@ -38,6 +39,12 @@ await page.goto("https://login.microsoftonline.com/", {
 // ─────────────────────────────────────────────
 if (!page.url().includes("login.microsoftonline.com")) {
     console.log("✅ Sessão já ativa! Nada a fazer.");
+    const cookies = await page.cookies();
+
+    await saveSessionCookies(cookies);
+
+    console.log(`💾 ${cookies.length} cookies enviados para o Supabase`);
+
     await browser.close();
     process.exit(0);
 }
@@ -148,15 +155,20 @@ try {
         console.log("ℹ️ Tela 'Manter conectado?' não apareceu");
     }
 
-    // ─────────────────────────────────────────
     // Aguarda cookies estabilizarem
     // ─────────────────────────────────────────
     await new Promise(r => setTimeout(r, 3000));
+
+    // Salva cookies no Supabase
+    const cookies = await page.cookies();
+
+    await saveSessionCookies(cookies);
 
     console.log("");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     console.log("✅ LOGIN REALIZADO COM SUCESSO");
     console.log("💾 Sessão salva em ./session-data");
+    console.log(`☁️ ${cookies.length} cookies enviados para o Supabase`);
     console.log("🚀 Agora rode normalmente:");
     console.log("node src/index.js");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

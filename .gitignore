@@ -123,3 +123,13 @@ $RECYCLE.BIN/
 # ==========================================
 render.yaml.local
 .render/
+
+
+fluxo.txt
+estrutura.txt
+
+downloads/
+logs/
+session-data/
+
+node_modules/

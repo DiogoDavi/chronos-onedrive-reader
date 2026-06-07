@@ -1,5 +1,17 @@
+import "dotenv/config";
 import { log } from "./logger.js";
 import { createClient } from "@supabase/supabase-js";
+
+if (!process.env.SUPABASE_URL) {
+    throw new Error("SUPABASE_URL não definida no .env");
+}
+
+if (
+    !process.env.SUPABASE_SERVICE_ROLE_KEY &&
+    !process.env.SUPABASE_KEY
+) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY não definida no .env");
+}
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -20,12 +32,24 @@ export async function setSessionStatus(status) {
 
 // ─── Salva cookies na tabela app_sessions ─────────────────────
 export async function saveSessionCookies(cookies) {
-    await supabase.from("app_sessions").upsert({
-        id: "microsoft_session",
-        cookies: JSON.stringify(cookies),
-        updated_at: new Date().toISOString()
-    });
-    log("💾 Cookies salvos no Supabase (app_sessions)");
+
+    if (!cookies || cookies.length === 0) {
+        throw new Error("Nenhum cookie recebido para salvar");
+    }
+
+    const { error } = await supabase
+        .from("app_sessions")
+        .upsert({
+            id: "microsoft_session",
+            cookies,
+            updated_at: new Date().toISOString()
+        });
+
+    if (error) {
+        throw error;
+    }
+
+    log(`💾 ${cookies.length} cookies salvos no Supabase`);
 }
 
 // ─── Restaura cookies do Supabase para o browser ──────────────
@@ -56,7 +80,11 @@ export async function restoreSessionCookies(page) {
     }
 
     for (const cookie of cookies) {
-        try { await page.setCookie(cookie); } catch { }
+        try {
+            await page.setCookie(cookie);
+        } catch (err) {
+            log(`⚠️ Cookie ignorado: ${cookie?.name}`);
+        }
     }
 
     log(`✅ Sessão restaurada (${Math.floor(diasDesdeUpdate)} dias de idade)`);
