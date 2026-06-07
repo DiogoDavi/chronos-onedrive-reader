@@ -66,7 +66,10 @@ async function getBrowserPath() {
 
     const { executablePath } = await import("puppeteer");
 
-    return executablePath();
+    return (
+      process.env.PUPPETEER_EXECUTABLE_PATH ||
+      executablePath()
+    );
 
   } catch {
 

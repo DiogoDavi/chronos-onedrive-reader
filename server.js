@@ -46,7 +46,10 @@ app.post("/internal/start-login", async (req, res) => {
       log("🔐 [start-login] Iniciando Puppeteer...");
 
       const { executablePath } = await import("puppeteer");
-      const chromePath = executablePath();
+
+      const chromePath =
+        process.env.PUPPETEER_EXECUTABLE_PATH ||
+        executablePath();
       log(`🔍 Chromium: ${chromePath}`);
 
       browser = await puppeteer.launch({
@@ -70,7 +73,7 @@ app.post("/internal/start-login", async (req, res) => {
       await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/136.0.0.0 Safari/537.36");
 
       // Tenta restaurar cookies antes do login
-      await restoreSessionCookies(page).catch(() => {});
+      await restoreSessionCookies(page).catch(() => { });
 
       await doLogin(page, email, password);
 
