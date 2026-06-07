@@ -109,8 +109,17 @@ export async function checkSession(page) {
         await setSessionStatus("active");
         return true;
     } catch {
+
+        log(`URL FINAL CHECK: ${page.url()}`);
+
+        const html = await page.content();
+
+        log(`HTML SIZE: ${html.length}`);
+
         log("🔴 Sessão expirada");
+
         await setSessionStatus("expired");
+
         return false;
     }
 }
