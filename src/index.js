@@ -49,7 +49,7 @@ async function start() {
 
         // cron job
         cron.schedule(
-            "*/2 * * * *",
+            "*/4 * * * *",
             async () => {
                 await safeRun("cron");
             },
